@@ -639,6 +639,7 @@ public class FileProcessorThread extends Thread {
                 String originalRotation = originalExifInterface.getAttribute(ExifInterface.TAG_ORIENTATION);
                 BufferedInputStream scaledInputStream = new BufferedInputStream(new FileInputStream(image.getOriginalPath()));
                 options.inJustDecodeBounds = false;
+                options.inSampleSize = calculateInSampleSize(options, scaledDimension[0], scaledDimension[1]);
                 bitmap = BitmapFactory.decodeStream(scaledInputStream, null, options);
                 scaledInputStream.close();
                 if (bitmap != null) {
@@ -648,24 +649,45 @@ public class FileProcessorThread extends Thread {
                                     .replace(".", "-resized.")));
                     FileOutputStream stream = new FileOutputStream(file);
 
-                    Matrix matrix = new Matrix();
-                    matrix.postScale((float) scaledDimension[0] / imageWidth, (float) scaledDimension[1] / imageHeight);
+//                    Matrix matrix = new Matrix();
+//                    matrix.postScale((float) scaledDimension[0] / imageWidth, (float) scaledDimension[1] / imageHeight);
 
-                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
-                            bitmap.getHeight(), matrix, false);
+//                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
+//                            bitmap.getHeight(), matrix, false);
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+                    stream.flush();
+                    stream.close();
                     image.setOriginalPath(file.getAbsolutePath());
                     ExifInterface resizedExifInterface = new ExifInterface(file.getAbsolutePath());
                     resizedExifInterface.setAttribute(ExifInterface.TAG_ORIENTATION, originalRotation);
                     resizedExifInterface.saveAttributes();
                     image.setWidth(scaledDimension[0]);
                     image.setHeight(scaledDimension[1]);
+                    bitmap.recycle();
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
         return image;
+    }
+
+    public static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // 源图片的高度和宽度
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+        if (height > reqHeight || width > reqWidth) {
+            // 计算出实际宽高和目标宽高的比率
+            final int heightRatio = Math.round((float) height / (float) reqHeight);
+            final int widthRatio = Math.round((float) width / (float) reqWidth);
+            // 选择宽和高中最小的比率作为inSampleSize的值，这样可以保证最终图片的宽和高
+//            inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+            inSampleSize = heightRatio < widthRatio ? widthRatio : heightRatio;
+//            Log.d("Sunway", "inSampleSize:" + inSampleSize + " " + height + " " + width + " " + reqHeight + " " + reqWidth + " " + heightRatio + " " + widthRatio);
+        }
+
+        return inSampleSize;
     }
 
     protected String downScaleAndSaveImage(String image, int scale) throws PickerException {
